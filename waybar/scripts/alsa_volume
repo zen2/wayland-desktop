@@ -1,0 +1,78 @@
+#!/bin/bash
+#
+# alsa_volume: generic alsa volume control for waybar
+#
+# author: zentoo@zentoo.org
+# version: 1.0
+
+script_name="$(basename $0)"
+usage() {
+  echo "$script_name [OPTION]... up|down|mute|unmute|toggle|waybar-exec"
+  echo
+  echo "  -c card      Select the alsa card by number or name"
+  echo "                 See: /proc/asound/cards - Ex: 2|NVidia|PCH|Device"
+  echo "  -D device    Select the alsa device instead of the default one"
+  echo "                 See: aplay -L - Ex: hdmi:CARD=NVidia,DEV=0 "
+  echo "  -C control   Select the mixer control. Default to Master"
+  echo "                 See: amixer - Ex: Mic|Line|Aux"
+  echo "  -i increment Set the volume increment to use in % or dB"
+  echo "                 Ex: 2%|2dB"
+  echo "  -n           Make waybar text start with a new line"
+  echo
+  echo "Example: $script_name -c STX -C Mic mute"
+}
+
+amixer_opts="-M"
+control="Master"
+increment="2%"
+text_newline=false
+
+while getopts "c:D:C:i:nh" opt ; do
+  case "$opt" in
+    c) amixer_opts+=" -c $OPTARG";;
+    D) amixer_opts+=" -D $OPTARG";;
+    C) control="$OPTARG";;
+    i) increment="$OPTARG";;
+    n) text_newline=true;;
+    h) usage ; exit 0 ;;
+    ?) echo "$script_name: invalid option -$opt"
+       echo "Try '$script_name -h' for more information."
+       exit 1 ;;
+  esac
+done
+shift "$(($OPTIND -1))"
+
+print_waybar_json()
+{
+  master="$(amixer $amixer_opts sget "$control"| tail -1)"
+  percentage="$(grep -o "[0-9]*%" <<< "$master")"
+  if grep -q "\[off\]$" <<< "$master" ; then
+    text=""
+    alt="muted"
+    class="muted"
+  else 
+    $text_newline && text="\n$percentage" || text="$percentage"
+    alt="default"
+    class="default"
+  fi
+  tooltip="$text"
+  echo "{\"text\": \"$text\", \"alt\": \"$alt\", \"tooltip\": \"$text\", \"class\": \"$class\", \"percentage\": ${percentage%\%} }"
+}
+  
+waybar_loop() {
+  local dummy
+  print_waybar_json
+  alsactl monitor | while read dummy ; do
+    print_waybar_json
+  done
+}
+
+case $@ in
+  up)           amixer -q $amixer_opts sset "$control" ${increment}+ ;;
+  down)         amixer -q $amixer_opts sset "$control" ${increment}- ;;
+  mute)         amixer -q $amixer_opts sset "$control" off ;;
+  unmute)       amixer -q $amixer_opts sset "$control" on ;;
+  toggle)       amixer -q $amixer_opts sset "$control" toggle ;;
+  waybar-exec)  waybar_loop ;;
+  *)      usage ; exit 1 ;;
+esac
