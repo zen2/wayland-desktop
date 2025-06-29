@@ -2,12 +2,13 @@
 #
 # alsa_volume: generic alsa volume control for waybar
 #
-# author: zentoo@zentoo.org
+# author: zentoo @zentoo.org
+# license: GNU GPL3
 #
-# version: 1.1
+# version: 20250629
 #
-# 1.0 Initial release
-# 1.1 command set VALUE
+# 20250628 Initial release
+# 20250629 command set VALUE
 #
 script_name="$(basename $0)"
 usage() {
